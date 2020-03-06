@@ -3,6 +3,7 @@ name = "pathetic"
 version = "0.1.0"
 authors = ["Jacob Brown <kardeiz@gmail.com>"]
 edition = "2018"
+license = "MIT"
 description = "Relative URI library for Rust, based on the `url` crate"
 readme = "README.md"
 repository = "https://github.com/kardeiz/pathetic"
