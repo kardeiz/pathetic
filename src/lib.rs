@@ -1,7 +1,11 @@
-use std::ops::{Deref, DerefMut};
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Uri(url::Url);
+
+impl std::fmt::Debug for Uri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Uri").field(&self.as_str()).finish()
+    }
+}
 
 impl From<&str> for Uri {
     fn from(t: &str) -> Self {
@@ -36,15 +40,19 @@ impl Uri {
         let mut query_start = None;
         let mut fragment_start = None;
 
-        for (idx, m) in input.match_indices(|c| c == '?' || c == '#') {
-            match m {
-                "?" => {
+        for (idx, c) in input.char_indices() {
+            match c {
+                '?' => {
                     query_start = Some(idx);
                 }
-                "#" => {
+                '#' => {
                     fragment_start = Some(idx);
                 }
                 _ => {}
+            }
+
+            if fragment_start.is_some() {
+                break;
             }
         }
 
@@ -69,20 +77,25 @@ impl Uri {
 
         Self(url)
     }
-    
+
     /// Return the serialization of this URL.    
     pub fn as_str(&self) -> &str {
         &self.0[url::Position::BeforePath..]
     }
 
-    /// Return this URL's fragment identifier, if any.
-    pub fn fragment(&self) -> Option<&str> {
-        self.0.fragment()
-    }
-
     /// Return the path for this URL, as a percent-encoded ASCII string.
     pub fn path(&self) -> &str {
         self.0.path()
+    }
+
+    /// Return this URL's query string, if any, as a percent-encoded ASCII string.
+    pub fn query(&self) -> Option<&str> {
+        self.0.query()
+    }
+
+    /// Return this URL's fragment identifier, if any.
+    pub fn fragment(&self) -> Option<&str> {
+        self.0.fragment()
     }
 
     /// Return an iterator of '/' slash-separated path segments, each as a percent-encoded ASCII string.
@@ -95,11 +108,6 @@ impl Uri {
         self.0.path_segments_mut().expect("`Uri` is always-a-base")
     }
 
-    /// Return this URL's query string, if any, as a percent-encoded ASCII string.
-    pub fn query(&self) -> Option<&str> {
-        self.0.query()
-    }
-
     /// Parse the URL's query string, if any, as application/x-www-form-urlencoded and return an iterator of (key, value) pairs.
     pub fn query_pairs(&self) -> url::form_urlencoded::Parse {
         self.0.query_pairs()
@@ -108,11 +116,6 @@ impl Uri {
     /// Manipulate this URL's query string, viewed as a sequence of name/value pairs in application/x-www-form-urlencoded syntax.
     pub fn query_pairs_mut(&mut self) -> url::form_urlencoded::Serializer<url::UrlQuery> {
         self.0.query_pairs_mut()
-    }
-
-    /// Change this URL's fragment identifier.
-    pub fn set_fragment(&mut self, fragment: Option<&str>) {
-        self.0.set_fragment(fragment)
     }
 
     /// Change this URL's path.
@@ -125,41 +128,56 @@ impl Uri {
         self.0.set_query(query)
     }
 
-    /// Modify the path segments inline.
-    pub fn with_path_segments_mut<F>(mut self, mut cls: F) -> Self where F: Fn(PathSegmentsMut) {
-        cls(PathSegmentsMut(self.path_segments_mut()));
+    /// Change this URL's fragment identifier.
+    pub fn set_fragment(&mut self, fragment: Option<&str>) {
+        self.0.set_fragment(fragment)
+    }
+
+    /// Modify the path inline.
+    pub fn with_path(mut self, path: &str) -> Self {
+        self.set_path(path);
+        self
+    }
+
+    /// Modify the fragment inline.
+    pub fn with_query(mut self, query: Option<&str>) -> Self {
+        self.set_query(query);
+        self
+    }
+
+    /// Modify the fragment inline.
+    pub fn with_fragment(mut self, fragment: Option<&str>) -> Self {
+        self.set_fragment(fragment);
         self
     }
 
     /// Modify the path segments inline.
-    pub fn with_query_pairs_mut<F>(mut self, cls: F) -> Self where F: Fn(url::form_urlencoded::Serializer<url::UrlQuery>) {
-        cls(self.query_pairs_mut());
+    pub fn with_path_segments_mut<F>(mut self, cls: F) -> Self
+    where
+        F: for<'a, 'b> Fn(&'b mut url::PathSegmentsMut<'a>) -> &'b mut url::PathSegmentsMut<'a>,
+    {
+        {
+            let mut path_segments_mut = self.path_segments_mut();
+            cls(&mut path_segments_mut);
+        }
+        self
+    }
+
+    /// Modify the query pairs inline.
+    pub fn with_query_pairs_mut<F>(mut self, cls: F) -> Self
+    where
+        F: for<'a, 'b> Fn(
+            &'b mut url::form_urlencoded::Serializer<'a, url::UrlQuery<'a>>,
+        )
+            -> &'b mut url::form_urlencoded::Serializer<'a, url::UrlQuery<'a>>,
+    {
+        {
+            let mut query_pairs_mut = self.query_pairs_mut();
+            cls(&mut query_pairs_mut);
+        }
         self
     }
 }
-
-pub struct PathSegmentsMut<'a>(url::PathSegmentsMut<'a>);
-
-impl<'a> PathSegmentsMut<'a> {
-    pub fn finish(&mut self) -> () {
-        ()
-    }
-}
-
-impl<'a> Deref for PathSegmentsMut<'a> {
-    type Target = url::PathSegmentsMut<'a>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> DerefMut for PathSegmentsMut<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 
 #[cfg(test)]
 mod tests {
@@ -168,29 +186,29 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut uri = Uri::new("../../../foo.html");
+        let mut uri = Uri::new("../../../foo.html?lorem=ipsum");
 
-        println!("{:?}", &uri);
+        assert_eq!("/foo.html?lorem=ipsum", uri.as_str());
 
-        uri.query_pairs_mut()
-            .clear()
-            .append_pair("foo", "bar & baz");
-        println!("{:?}", &uri.as_str());
+        uri.query_pairs_mut().clear().append_pair("foo", "bar & baz");
 
+        assert_eq!("/foo.html?foo=bar+%26+baz", uri.as_str());
 
         let mut uri = Uri::default();
 
-        uri.path_segments_mut()
-            .extend(&["foo", "bar", "baz"]);
+        uri.path_segments_mut().extend(&["foo", "bar", "baz"]);
+
+        assert_eq!("/foo/bar/baz", uri.as_str());
 
         uri.path_segments_mut().clear();
 
-        println!("{:?}", &uri.as_str());
+        assert_eq!("/", uri.as_str());
 
-        let mut uri = Uri::default()
-            .with_path_segments_mut(|mut p| drop(p.extend(&["foo", "bar"])) )
-            .with_query_pairs_mut(|mut q| drop(q.append_pair("foo", "bar & baz")));
+        let uri = Uri::default()
+            .with_path_segments_mut(|p| p.extend(&["foo", "bar"]))
+            .with_query_pairs_mut(|q| q.append_pair("foo", "bar"))
+            .with_fragment(Some("baz"));
 
-        println!("{:?}", &uri.as_str());
+        assert_eq!("/foo/bar?foo=bar#baz", uri.as_str());
     }
 }
