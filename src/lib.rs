@@ -1,3 +1,5 @@
+use std::ops::{Deref, DerefMut};
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Uri(url::Url);
 
@@ -10,6 +12,12 @@ impl From<&str> for Uri {
 impl AsRef<str> for Uri {
     fn as_ref(&self) -> &str {
         self.as_str()
+    }
+}
+
+impl Default for Uri {
+    fn default() -> Self {
+        Self(Self::base_url())
     }
 }
 
@@ -79,12 +87,12 @@ impl Uri {
 
     /// Return an iterator of '/' slash-separated path segments, each as a percent-encoded ASCII string.
     pub fn path_segments(&self) -> std::str::Split<char> {
-        self.0.path_segments().expect("`URI` is always-a-base")
+        self.0.path_segments().expect("`Uri` is always-a-base")
     }
 
-    /// Return an object with methods to manipulate this URL’s path segments.
+    /// Return an object with methods to manipulate this URL's path segments.
     pub fn path_segments_mut(&mut self) -> url::PathSegmentsMut {
-        self.0.path_segments_mut().expect("`URI` is always-a-base")
+        self.0.path_segments_mut().expect("`Uri` is always-a-base")
     }
 
     /// Return this URL's query string, if any, as a percent-encoded ASCII string.
@@ -112,12 +120,46 @@ impl Uri {
         self.0.set_path(path)
     }
 
-    /// Change this URL’s query string.
+    /// Change this URL's query string.
     pub fn set_query(&mut self, query: Option<&str>) {
         self.0.set_query(query)
     }
 
+    /// Modify the path segments inline.
+    pub fn with_path_segments_mut<F>(mut self, mut cls: F) -> Self where F: Fn(PathSegmentsMut) {
+        cls(PathSegmentsMut(self.path_segments_mut()));
+        self
+    }
+
+    /// Modify the path segments inline.
+    pub fn with_query_pairs_mut<F>(mut self, cls: F) -> Self where F: Fn(url::form_urlencoded::Serializer<url::UrlQuery>) {
+        cls(self.query_pairs_mut());
+        self
+    }
 }
+
+pub struct PathSegmentsMut<'a>(url::PathSegmentsMut<'a>);
+
+impl<'a> PathSegmentsMut<'a> {
+    pub fn finish(&mut self) -> () {
+        ()
+    }
+}
+
+impl<'a> Deref for PathSegmentsMut<'a> {
+    type Target = url::PathSegmentsMut<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> DerefMut for PathSegmentsMut<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -126,11 +168,29 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut uri = Uri::new("/foo.html");
+        let mut uri = Uri::new("../../../foo.html");
+
+        println!("{:?}", &uri);
 
         uri.query_pairs_mut()
             .clear()
             .append_pair("foo", "bar & baz");
+        println!("{:?}", &uri.as_str());
+
+
+        let mut uri = Uri::default();
+
+        uri.path_segments_mut()
+            .extend(&["foo", "bar", "baz"]);
+
+        uri.path_segments_mut().clear();
+
+        println!("{:?}", &uri.as_str());
+
+        let mut uri = Uri::default()
+            .with_path_segments_mut(|mut p| drop(p.extend(&["foo", "bar"])) )
+            .with_query_pairs_mut(|mut q| drop(q.append_pair("foo", "bar & baz")));
+
         println!("{:?}", &uri.as_str());
     }
 }
