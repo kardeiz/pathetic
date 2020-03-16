@@ -27,7 +27,7 @@ impl Default for Uri {
 
 impl Uri {
     fn base_url() -> url::Url {
-        use once_cell::sync::Lazy;
+        use once_cell::sync::Lazy; 
         static URL: Lazy<url::Url> =
             Lazy::new(|| "http://_".parse().expect("`http://_` is a valid `URL`"));
         URL.clone()
@@ -210,5 +210,13 @@ mod tests {
             .with_fragment(Some("baz"));
 
         assert_eq!("/foo/bar?foo=bar#baz", uri.as_str());
+
+        let uri = Uri::default()
+            .with_path("./foo/bar.html");
+
+        assert_eq!("./foo/bar.html", uri.as_str());
+
+
+
     }
 }
