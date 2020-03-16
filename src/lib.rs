@@ -1,3 +1,18 @@
+//! A library for working with relative URIs, based on the `url` crate.
+//! 
+//! # Usage:
+//! 
+//! ```rust
+//! fn main() {
+//!     let uri = pathetic::Uri::default()
+//!         .with_path_segments_mut(|p| p.extend(&["foo", "bar"]))
+//!         .with_query_pairs_mut(|q| q.append_pair("foo", "bar"))
+//!         .with_fragment(Some("baz"));
+//! 
+//!     assert_eq!("/foo/bar?foo=bar#baz", uri.as_str());
+//! } 
+//! ```
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Uri(url::Url);
 
@@ -7,8 +22,9 @@ impl std::fmt::Debug for Uri {
     }
 }
 
-impl From<&str> for Uri {
-    fn from(t: &str) -> Self {
+impl std::convert::TryFrom<&str> for Uri {
+    type Error = url::ParseError;
+    fn try_from(t: &str) -> Result<Self, Self::Error> {
         Self::new(t)
     }
 }
@@ -33,55 +49,20 @@ impl Uri {
         URL.clone()
     }
 
-    /// Create a new `URI`, from a path-query-fragment `str`.
-    pub fn new(input: &str) -> Self {
-        let mut url = Self::base_url();
+    /// Create a new `Uri`, from a path-query-fragment `str`.
+    pub fn new(input: &str) -> Result<Self, url::ParseError> {
+        Self::base_url().join(input).map(Self)
+    }
 
-        let mut query_start = None;
-        let mut fragment_start = None;
-
-        for (idx, c) in input.char_indices() {
-            match c {
-                '?' => {
-                    query_start = Some(idx);
-                }
-                '#' => {
-                    fragment_start = Some(idx);
-                }
-                _ => {}
-            }
-
-            if fragment_start.is_some() {
-                break;
-            }
-        }
-
-        match (query_start, fragment_start) {
-            (None, None) => {
-                url.set_path(input);
-            }
-            (Some(q), None) => {
-                url.set_path(&input[..q]);
-                url.set_query(Some(&input[q + 1..]));
-            }
-            (Some(q), Some(f)) => {
-                url.set_path(&input[..q]);
-                url.set_query(Some(&input[q + 1..f]));
-                url.set_fragment(Some(&input[f + 1..]));
-            }
-            (None, Some(f)) => {
-                url.set_path(&input[..f]);
-                url.set_fragment(Some(&input[f + 1..]));
-            }
-        }
-
-        Self(url)
+    /// Parse a string as an URL, with this URL as the base URL.
+    pub fn join(&self, input: &str) -> Result<Self, url::ParseError> {
+        self.0.join(input).map(Self)
     }
 
     /// Return the serialization of this URL.    
     pub fn as_str(&self) -> &str {
         &self.0[url::Position::BeforePath..]
-    }
+    }    
 
     /// Return the path for this URL, as a percent-encoded ASCII string.
     pub fn path(&self) -> &str {
@@ -186,7 +167,13 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut uri = Uri::new("../../../foo.html?lorem=ipsum");
+
+        let uri = Uri::default()
+            .with_path_segments_mut(|p| p.push("foo"));
+
+        assert_eq!("Uri(\"/foo\")", format!("{:?}", &uri));
+
+        let mut uri = Uri::new("../../../foo.html?lorem=ipsum").unwrap();
 
         assert_eq!("/foo.html?lorem=ipsum", uri.as_str());
 
@@ -200,9 +187,17 @@ mod tests {
 
         assert_eq!("/foo/bar/baz", uri.as_str());
 
+        let uri = uri.join("/baz").unwrap();
+
+        assert_eq!("/baz", uri.as_str());
+
+        let mut uri = uri.join("?foo=bar").unwrap();
+
+        assert_eq!("/baz?foo=bar", uri.as_str());
+
         uri.path_segments_mut().clear();
 
-        assert_eq!("/", uri.as_str());
+        assert_eq!("/?foo=bar", uri.as_str());
 
         let uri = Uri::default()
             .with_path_segments_mut(|p| p.extend(&["foo", "bar"]))
@@ -211,12 +206,11 @@ mod tests {
 
         assert_eq!("/foo/bar?foo=bar#baz", uri.as_str());
 
-        let uri = Uri::default()
-            .with_path("./foo/bar.html");
+        let uri = Uri::default().with_path("/a/b/c/d/e/f/g");
 
-        assert_eq!("./foo/bar.html", uri.as_str());
+        let uri = uri.join("../../../../..").unwrap();
 
-
+        assert_eq!("/a/", uri.as_str());
 
     }
 }

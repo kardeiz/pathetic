@@ -1,6 +1,9 @@
 # pathetic
 
-A library for working with relative URIs, based on the `url` crate:
+[![Docs](https://docs.rs/pathetic/badge.svg)](https://docs.rs/crate/pathetic/)
+[![Crates.io](https://img.shields.io/crates/v/pathetic.svg)](https://crates.io/crates/pathetic)
+
+A library for working with relative URIs, based on the `url` crate.
 
 ## Usage:
 
@@ -12,5 +15,11 @@ fn main() {
         .with_fragment(Some("baz"));
 
     assert_eq!("/foo/bar?foo=bar#baz", uri.as_str());
-} 
+}
 ```
+
+<hr/>
+
+Current version: 0.2.1
+
+License: MIT
