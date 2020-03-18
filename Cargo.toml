@@ -1,6 +1,6 @@
 [package]
 name = "pathetic"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Jacob Brown <kardeiz@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -13,3 +13,4 @@ keywords = ["parser", "url", "uri"]
 [dependencies]
 once_cell = "1"
 url = "2.1"
+actix-web = { version = "2", optional = true }

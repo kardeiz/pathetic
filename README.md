@@ -20,6 +20,6 @@ fn main() {
 
 <hr/>
 
-Current version: 0.2.1
+Current version: 0.3.0
 
 License: MIT

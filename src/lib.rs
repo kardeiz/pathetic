@@ -13,6 +13,12 @@
 //! } 
 //! ```
 
+/// Create a new base `Uri`
+pub fn uri() -> Uri {
+    Uri::default()
+}
+
+/// The relative URI container
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Uri(url::Url);
 
@@ -22,10 +28,25 @@ impl std::fmt::Debug for Uri {
     }
 }
 
+impl std::fmt::Display for Uri {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
 impl std::convert::TryFrom<&str> for Uri {
     type Error = url::ParseError;
     fn try_from(t: &str) -> Result<Self, Self::Error> {
         Self::new(t)
+    }
+}
+
+#[cfg(feature = "actix-web")]
+impl From<&actix_web::http::uri::Uri> for Uri {
+    fn from(t: &actix_web::http::uri::Uri) -> Self {
+        Self::default()
+            .with_path(t.path())
+            .with_query(t.query())
     }
 }
 
